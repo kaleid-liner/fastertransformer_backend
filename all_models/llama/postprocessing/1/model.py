@@ -44,7 +44,7 @@ class TritonPythonModel:
         from transformers import LlamaTokenizer
         
         # customize
-        self.tokenizer = LlamaTokenizer.from_pretrained("/ft_workspace/llama_7b_hf")
+        self.tokenizer = LlamaTokenizer.from_pretrained("meta-llama/Llama-2-7b-hf", cache_dir="/data/checkpoint_hub")
         # self.tokenizer = LlamaTokenizer.from_pretrained("decapoda-research/llama-7b-hf")
 
     def execute(self, requests):

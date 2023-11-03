@@ -76,10 +76,12 @@ class TritonPythonModel:
         cur_folder = Path(__file__).parent
 
         from transformers import LlamaTokenizer
-        self.tokenizer = LlamaTokenizer.from_pretrained('/ft_workspace/llama_7b_hf')
+        self.tokenizer = LlamaTokenizer.from_pretrained("meta-llama/Llama-2-7b-hf", cache_dir="/data/checkpoint_hub")
         # self.tokenizer = LlamaTokenizer.from_pretrained("decapoda-research/llama-7b-hf")
         self.start_id = self.tokenizer.eos_token_id
         self.end_id = self.tokenizer.bos_token_id
+        self.tokenizer.pad_token_id = 0
+        self.tokenizer.padding_side = "left"
         print(f"start id: {self.start_id} end id: {self.end_id}")
 
     def execute(self, requests):
@@ -170,9 +172,9 @@ class TritonPythonModel:
         """
             query : batch string (2D numpy array)
         """
-        start_ids = [torch.IntTensor(self.tokenizer.encode(s[0].decode())) for s in query]
-        start_lengths = torch.IntTensor([[len(ids)] for ids in start_ids])
+        sentences = [s[0].decode() for s in query]
+        encoded_inputs = tokenizer.batch_encode_plus(sentences)
+        input_ids = torch.IntTensor(tokenizer.pad(encoded_inputs, pad_to_multiple_of=16)["input_ids"])
+        input_lengths = torch.IntTensor([len(ids) for ids in input_ids])
 
-        start_ids = pad_sequence(start_ids, batch_first=True, padding_value=self.end_id)
-
-        return start_ids, start_lengths
+        return input_ids, input_lengths
