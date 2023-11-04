@@ -20,10 +20,15 @@ parser.add_argument('-pro', '--protocol', type=str, required=False, default='grp
                     help='Inference server Appkey. Default is .')
 parser.add_argument('--model_name', type=str, default="fastertransformer",
                     help='model_name')
+parser.add_argument('--server_name', type=str, default="10.190.175.139",
+                    help='Service hostname')
+parser.add_argument('--server_port', type=int, default=80,
+                    help='Service port')
+parser.add_argument('--project_name', type=str, default="FasterTransformer")
 FLAGS = parser.parse_args()
 
 tokenizer = LlamaTokenizer.from_pretrained("meta-llama/Llama-2-13b-chat-hf", cache_dir="/data/checkpoint_hub")
-tokenizer.pad_token_id = 0
+tokenizer.pad_token_id = 1
 tokenizer.padding_side = "left"
 
 verbose = 0
@@ -123,6 +128,10 @@ def reset_state():
     return []
 
 
+def set_user_input(user_input):
+    return gr.update(value=user_input)
+
+
 class TritongRPCModel:
     def stream_chat(self, input, max_length, top_p, temperature):
         with create_inference_server_client(FLAGS.protocol,
@@ -151,15 +160,20 @@ class TritongRPCModel:
 
 model = TritongRPCModel()
 
+choices = [
+    "Hey, are you consciours? Can you talk to me?",
+    "Tell me the story of the Titanic",
+]
+
 with gr.Blocks() as demo:
-    gr.HTML("""<h1 align="center">ChatGLM</h1>""")
+    gr.HTML("""<h1 align="center">{}</h1>""".format(FLAGS.project_name))
 
     chatbot = gr.Chatbot()
     with gr.Row():
         with gr.Column(scale=4):
             with gr.Column(scale=12):
-                user_input = gr.Textbox(show_label=False, placeholder="Input...", lines=10).style(
-                    container=False)
+                user_input = gr.Textbox(show_label=False, placeholder="Input...", lines=10)
+                user_input_choices = gr.Dropdown(choices=choices, label="Or choose one")
             with gr.Column(min_width=32, scale=1):
                 submitBtn = gr.Button("Submit", variant="primary")
         with gr.Column(scale=1):
@@ -168,10 +182,11 @@ with gr.Blocks() as demo:
             top_p = gr.Slider(0, 1, value=0.6, step=0.01, label="Top P", interactive=True)
             temperature = gr.Slider(0, 1, value=0.9, step=0.01, label="Temperature", interactive=True)
 
+    user_input_choices.input(set_user_input, [user_input_choices], [user_input])
     submitBtn.click(predict, [user_input, chatbot, max_length, top_p, temperature], [chatbot],
                     show_progress=True)
     submitBtn.click(reset_user_input, [], [user_input])
 
     emptyBtn.click(reset_state, outputs=[chatbot], show_progress=True)
 
-demo.queue().launch(share=False, inbrowser=True)
+demo.queue().launch(share=True, inbrowser=True, server_port=FLAGS.server_port, server_name=FLAGS.server_name)
