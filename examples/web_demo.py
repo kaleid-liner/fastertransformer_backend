@@ -10,7 +10,6 @@ import argparse
 from functools import partial
 from tritonclient.grpc.service_pb2 import ModelInferResponse
 from tritonclient.utils import InferenceServerException
-import re
 
 
 parser = argparse.ArgumentParser()
@@ -33,10 +32,13 @@ tokenizer.padding_side = "left"
 
 verbose = 0
 
+prompt = "[INST] «SYS»\nYou are a helpful, respectful and honest assistant. Always answer as helpfully as possible, while being safe.\n\nIf a question does not make any sense, or is not factually coherent, explain why instead of answering something not correct. If you don’t know the answer to a question, please don’t share false information.\n«/SYS»\n\n{} [/INST]"
+prompt2 = "[INST] «SYS»\nYou are a helpful, respectful and honest assistant. Always answer as helpfully as possible, while being safe. Your answers should not include any harmful, unethical, racist, sexist, toxic, dangerous, or illegal content. Please ensure that your responses are socially unbiased and positive in nature.\n\nIf a question does not make any sense, or is not factually coherent, explain why instead of answering something not correct. If you don’t know the answer to a question, please don’t share false information.\n«/SYS»\n\n{} [/INST]"
+
 
 def lines2inputs(FLAGS, lines, tokenizer, max_length, top_p, temperature):
-    encoded_inputs = tokenizer.batch_encode_plus(lines)
-    input_ids = np.array(tokenizer.pad(encoded_inputs, pad_to_multiple_of=16)["input_ids"], dtype=np.uint32)
+    encoded_inputs = tokenizer.batch_encode_plus(lines, truncation=True, max_length=448)
+    input_ids = np.array(tokenizer.pad(encoded_inputs, pad_to_multiple_of=64)["input_ids"], dtype=np.uint32)
     input_lengths = np.array([len(ids) for ids in input_ids], dtype=np.uint32).reshape(-1, 1)
     request_output_len = max_length * np.ones([input_ids.shape[0], 1]).astype(np.uint32)
     runtime_top_p = top_p * np.ones([input_ids.shape[0], 1]).astype(np.float32)
@@ -63,9 +65,6 @@ def parse_text(text):
     lines = [line for line in lines if line != ""]
     count = 0
     for i, line in enumerate(lines):
-        line = re.sub(r"Answer:\ *", "", line)
-        if line in "Answer:  ":
-            line = ""
         lines[i] = line
         if "```" in line:
             count += 1
@@ -140,6 +139,7 @@ class TritongRPCModel:
                                             verbose=verbose) as client:
             result_queue = Queue()
             client.start_stream(callback=partial(stream_callback, result_queue))
+            input = prompt2.format(input)
             inputs, input_lengths = lines2inputs(FLAGS, [input], tokenizer, max_length, top_p, temperature)
             client.async_stream_infer(FLAGS.model_name, inputs)
 
