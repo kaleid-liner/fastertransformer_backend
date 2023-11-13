@@ -223,7 +223,7 @@ parameters {
 parameters {
   key: "model_checkpoint_path"
   value: {
-    string_value: "/data/llama-2-13b-chat-ft/1-gpu/"
+    string_value: "/data/llama-2-13b-chat-int4-nolop3-ft/1-gpu/"
   }
 }
 parameters {
